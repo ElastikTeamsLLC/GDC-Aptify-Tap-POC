@@ -4,93 +4,81 @@ This includes aptifyStream and aptifyConnector.
 """
 
 from __future__ import annotations
-
 import typing as t
-
-import sqlalchemy  # noqa: TC002
+import sqlalchemy
+from sqlalchemy.engine import URL
 from singer_sdk import SQLConnector, SQLStream
 
-
 class aptifyConnector(SQLConnector):
-    """Connects to the aptify SQL source."""
+    """Connector class for MSSQL (Azure SQL Database) using SQLAlchemy and pyodbc."""
 
     def get_sqlalchemy_url(self, config: dict) -> str:
-        """Concatenate a SQLAlchemy URL for use in connecting to the source.
+        if "connection_string" in config:
+            return config["connection_string"]
+        driver = config.get("driver", "ODBC Driver 17 for SQL Server")
+        server = config["server"]
+        port = config.get("port", 1433)
+        database = config["database"]
+        user = config["user"]
+        password = config["password"]
 
-        Args:
-            config: A dict with connection parameters
-
-        Returns:
-            SQLAlchemy connection string
-        """
-        # TODO: Replace this with a valid connection string for your source:
-        return (
-            f"awsathena+rest://{config['aws_access_key_id']}:"
-            f"{config['aws_secret_access_key']}@athena"
-            f".{config['aws_region']}.amazonaws.com:443/"
-            f"{config['schema_name']}?"
-            f"s3_staging_dir={config['s3_staging_dir']}"
+        connection_url = URL.create(
+            "mssql+pyodbc",
+            username=user,
+            password=password,
+            host=server,
+            port=port,
+            database=database,
+            query={"driver": driver, "Encrypt": "yes", "TrustServerCertificate": "no"},
         )
+        return str(connection_url)
+
+    def to_jsonschema_type(self, sql_type):
+        """Convert SQL type to JSON Schema type.
+        Args:
+            sql_type: SQLAlchemy SQL type.
+        Returns:
+            JSON Schema type.
+        """
+        return super().to_jsonschema_type(sql_type)
 
     @staticmethod
-    def to_jsonschema_type(
-        from_type: str
-        | sqlalchemy.types.TypeEngine
-        | type[sqlalchemy.types.TypeEngine],
-    ) -> dict:
-        """Returns a JSON Schema equivalent for the given SQL type.
-
-        Developers may optionally add custom logic before calling the default
-        implementation inherited from the base class.
-
+    def to_sql_type(jsonschema_type):
+        """Convert JSON Schema type to SQL type.
         Args:
-            from_type: The SQL type as a string or as a TypeEngine. If a TypeEngine is
-                provided, it may be provided as a class or a specific object instance.
-
+            jsonschema_type: JSON Schema type.
         Returns:
-            A compatible JSON Schema type definition.
+            SQLAlchemy SQL type.
         """
-        # Optionally, add custom logic before calling the parent SQLConnector method.
-        # You may delete this method if overrides are not needed.
-        return SQLConnector.to_jsonschema_type(from_type)
-
-    @staticmethod
-    def to_sql_type(jsonschema_type: dict) -> sqlalchemy.types.TypeEngine:
-        """Returns a JSON Schema equivalent for the given SQL type.
-
-        Developers may optionally add custom logic before calling the default
-        implementation inherited from the base class.
-
-        Args:
-            jsonschema_type: A dict
-
-        Returns:
-            SQLAlchemy type
-        """
-        # Optionally, add custom logic before calling the parent SQLConnector method.
-        # You may delete this method if overrides are not needed.
         return SQLConnector.to_sql_type(jsonschema_type)
 
 
 class aptifyStream(SQLStream):
     """Stream class for aptify streams."""
-
     connector_class = aptifyConnector
 
     def get_records(self, partition: dict | None) -> t.Iterable[dict[str, t.Any]]:
         """Return a generator of record-type dictionary objects.
-
-        Developers may optionally add custom logic before calling the default
-        implementation inherited from the base class.
-
+        This method extracts data from the tables specified in the tap configuration.
         Args:
-            partition: If provided, will read specifically from this data slice.
-
+            partition: If provided, read specifically from this partition (not used here).
         Yields:
             One dict per record.
         """
-        # Optionally, add custom logic instead of calling the super().
-        # This is helpful if the source database provides batch-optimized record
-        # retrieval.
-        # If no overrides or optimizations are needed, you may delete this method.
-        yield from super().get_records(partition)
+        # Retrieve the list of tables from the tap configuration.
+        tables = self.config.get("tables", [])
+        if not tables:
+            self.logger.error("No tables specified in the configuration.")
+            return
+
+        # Create the SQLAlchemy engine using the connector.
+        engine = self.connector.create_engine()
+        with engine.connect() as conn:
+            for table in tables:
+                query = f"SELECT * FROM {table}"
+                self.logger.info(f"Extracting records from table: {table}")
+                result = conn.execute(query)
+                for row in result:
+                    record = dict(row._mapping)
+                    
+                    yield record

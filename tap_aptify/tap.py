@@ -1,50 +1,22 @@
-"""aptify tap class."""
-
-from __future__ import annotations
-
 from singer_sdk import SQLTap
-from singer_sdk import typing as th  # JSON schema typing helpers
-
-from tap_aptify.client import aptifyStream
-
+from singer_sdk.typing import PropertiesList, Property, StringType, IntegerType, DateTimeType
+from .client import aptifyConnector, aptifyStream
 
 class Tapaptify(SQLTap):
-    """aptify tap class."""
+    """Singer tap for extracting data from an MSSQL (Azure SQL) database."""
 
     name = "tap-aptify"
     default_stream_class = aptifyStream
 
-    # TODO: Update this section with the actual config values you expect:
-    config_jsonschema = th.PropertiesList(
-        th.Property(
-            "auth_token",
-            th.StringType,
-            required=True,
-            secret=True,  # Flag config as protected.
-            title="Auth Token",
-            description="The token to authenticate against the API service",
-        ),
-        th.Property(
-            "project_ids",
-            th.ArrayType(th.StringType),
-            required=True,
-            title="Project IDs",
-            description="Project IDs to replicate",
-        ),
-        th.Property(
-            "start_date",
-            th.DateTimeType,
-            description="The earliest record date to sync",
-        ),
-        th.Property(
-            "api_url",
-            th.StringType,
-            title="API URL",
-            default="https://api.mysample.com",
-            description="The url for the API service",
-        ),
+    config_jsonschema = PropertiesList(
+        Property("server", StringType, required=True, description="FQDN of the SQL server"),
+        Property("port", IntegerType, default=1433, description="Port for SQL connection"),
+        Property("database", StringType, required=True, description="Database name"),
+        Property("user", StringType, required=True, description="User with SQL access"),
+        Property("password", StringType, required=True, secret=True, description="Password for the user"),
+        Property("driver", StringType, default="ODBC Driver 17 for SQL Server", description="ODBC driver name"),
+        Property("start_date", DateTimeType, description="Earliest record date for incremental sync"),
     ).to_dict()
-
 
 if __name__ == "__main__":
     Tapaptify.cli()
