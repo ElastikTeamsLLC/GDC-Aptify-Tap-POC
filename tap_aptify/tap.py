@@ -50,6 +50,7 @@ class Tapaptify(SQLTap):
         Property("database", StringType, description="Database name", required=True),
         Property("user", StringType, description="User with SQL access", required=True),
         Property("password", StringType, secret=True, description="Password for the user", required=True),
+        Property("connection_string", StringType, secret=True, description="Connection String"),
         Property("sqlalchemy_eng_params", ObjectType(
             Property("fast_executemany", StringType, description="Fast Executemany Mode: True, False"),
             Property("future", StringType, description="Run the engine in 2.0 mode: True, False")
