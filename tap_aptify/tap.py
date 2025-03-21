@@ -1,5 +1,5 @@
 from singer_sdk import SQLConnector, SQLTap, SQLStream
-from singer_sdk.typing import PropertiesList, Property, StringType, IntegerType, DateTimeType
+from singer_sdk.typing import PropertiesList, Property, StringType, BooleanType, ObjectType, DateTimeType
 from .client import aptifyConnector, aptifyStream
 
 class Tapaptify(SQLTap):
@@ -43,14 +43,33 @@ class Tapaptify(SQLTap):
         return self._catalog_dict
 
     config_jsonschema = PropertiesList(
-        Property("connection_string", StringType, description="Optional full connection string"),
-        Property("host", StringType, description="FQDN of the SQL server"),
-        Property("port", IntegerType, default=1433, description="Port for SQL connection"),
-        Property("database", StringType, description="Database name"),
-        Property("user", StringType, description="User with SQL access"),
-        Property("password", StringType, secret=True, description="Password for the user"),
-        Property("driver", StringType, default="ODBC Driver 17 for SQL Server", description="ODBC driver name"),
+        Property("dialect", StringType, default="mssql", description="The Dialect of SQLAlchemy", required=True),
+        Property("driver_type", StringType, default="pyodbc", description="The Python Driver to use for SQL connection", required=True),
+        Property("host", StringType, description="FQDN of the SQL server", required=True),
+        Property("port", StringType, description="Port for SQL connection"),  # Changed to StringType
+        Property("database", StringType, description="Database name", required=True),
+        Property("user", StringType, description="User with SQL access", required=True),
+        Property("password", StringType, secret=True, description="Password for the user", required=True),
+        Property("sqlalchemy_eng_params", ObjectType(
+            Property("fast_executemany", StringType, description="Fast Executemany Mode: True, False"),
+            Property("future", StringType, description="Run the engine in 2.0 mode: True, False")
+        ), description="SQLAlchemy Engine Parameters: fast_executemany, future"),
+        Property("sqlalchemy_url_query", ObjectType(
+            Property("driver", StringType, description="The Driver to use when connecting"),
+            Property("TrustServerCertificate", StringType, description="This is a Yes No option")
+        ), description="SQLAlchemy URL Query options: driver, TrustServerCertificate"),
+        Property("batch_config", ObjectType(
+            Property("encoding", ObjectType(
+                Property("format", StringType, description="Currently the only format is jsonl"),
+                Property("compression", StringType, description="Currently the only compression option is gzip")
+            )),
+            Property("storage", ObjectType(
+                Property("root", StringType, description="Directory for batch messages, e.g., file://test/batches"),
+                Property("prefix", StringType, description="Prefix for batch messages, e.g., test-batch-")
+            ))
+        ), description="Optional Batch Message configuration"),
         Property("start_date", DateTimeType, description="Earliest record date for incremental sync"),
+        Property("hd_jsonschema_types", BooleanType, default=False, description="Turn on Higher Defined(HD) JSON Schema types to assist Targets")
     ).to_dict()
 
     def discover_streams(self) -> list[SQLStream]:
