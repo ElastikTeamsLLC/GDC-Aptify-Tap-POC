@@ -17,7 +17,7 @@ class aptifyConnector(SQLConnector):
             return config['connection_string']
         driver = config.get('driver', "ODBC Driver 17 for SQL Server")
         host = config['host']
-        port = config.get('port', 1433)
+        port = 1433,
         database = config['database']
         user = config['user']
         password = config['password']
