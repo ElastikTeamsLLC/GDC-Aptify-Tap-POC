@@ -35,7 +35,7 @@ class aptifyConnector(SQLConnector):
         database = config['database']
         user = config['user']
         password = config['password']
-        port = config.get('port')  # Port is optional
+        port = int(config['port'])  # Port is optional
 
         # Create the base URL
         connection_url = URL.create(
