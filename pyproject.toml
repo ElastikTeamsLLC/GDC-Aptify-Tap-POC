@@ -24,7 +24,8 @@ requires-python = ">=3.9"
 dependencies = [
     "singer-sdk~=0.44.3",
     "sqlalchemy~=2.0.36",
-    "pyodbc"
+    "pyodbc",
+    "pendulum"
 ]
 
 [project.optional-dependencies]
