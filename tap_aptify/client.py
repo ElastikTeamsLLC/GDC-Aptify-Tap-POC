@@ -16,7 +16,7 @@ class aptifyConnector(SQLConnector):
         if "connection_string" in config:
             return config["connection_string"]
         driver = config.get("driver", "ODBC Driver 17 for SQL Server")
-        server = config["server"]
+        host = config["host"]
         port = config.get("port", 1433)
         database = config["database"]
         user = config["user"]
@@ -26,7 +26,7 @@ class aptifyConnector(SQLConnector):
             "mssql+pyodbc",
             username=user,
             password=password,
-            host=server,
+            host=host,
             port=port,
             database=database,
             query={"driver": driver, "Encrypt": "yes", "TrustServerCertificate": "no"},

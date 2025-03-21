@@ -44,11 +44,11 @@ class Tapaptify(SQLTap):
 
     config_jsonschema = PropertiesList(
         Property("connection_string", StringType, description="Optional full connection string"),
-        Property("server", StringType, required=True, description="FQDN of the SQL server"),
+        Property("host", StringType, description="FQDN of the SQL server"),
         Property("port", IntegerType, default=1433, description="Port for SQL connection"),
-        Property("database", StringType, required=True, description="Database name"),
-        Property("user", StringType, required=True, description="User with SQL access"),
-        Property("password", StringType, required=True, secret=True, description="Password for the user"),
+        Property("database", StringType, description="Database name"),
+        Property("user", StringType, description="User with SQL access"),
+        Property("password", StringType, secret=True, description="Password for the user"),
         Property("driver", StringType, default="ODBC Driver 17 for SQL Server", description="ODBC driver name"),
         Property("start_date", DateTimeType, description="Earliest record date for incremental sync"),
     ).to_dict()
