@@ -1,0 +1,4 @@
+pendulum
+pyodbc
+singer-sdk~=0.44.3
+qlalchemy~=2.0.36
