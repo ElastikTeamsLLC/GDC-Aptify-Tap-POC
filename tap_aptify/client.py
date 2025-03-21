@@ -13,23 +13,23 @@ class aptifyConnector(SQLConnector):
     """Connector class for MSSQL (Azure SQL Database) using SQLAlchemy and pyodbc."""
 
     def get_sqlalchemy_url(self, config: dict) -> str:
-        if "connection_string" in config:
-            return config["connection_string"]
-        driver = config.get("driver", "ODBC Driver 17 for SQL Server")
-        host = config["host"]
-        port = config.get("port", 1433)
-        database = config["database"]
-        user = config["user"]
-        password = config["password"]
+        if 'connection_string' in config:
+            return config['connection_string']
+        driver = config.get('driver', "ODBC Driver 17 for SQL Server")
+        host = config['host']
+        port = config.get('port', 1433)
+        database = config['database']
+        user = config['user']
+        password = config['password']
 
         connection_url = URL.create(
-            "mssql+pyodbc",
+            'mssql+pyodbc',
             username=user,
             password=password,
             host=host,
             port=port,
             database=database,
-            query={"driver": driver, "Encrypt": "yes", "TrustServerCertificate": "no"},
+            query={'driver': driver, 'Encrypt': 'yes', 'TrustServerCertificate': 'yes'},
         )
         return str(connection_url)
 
