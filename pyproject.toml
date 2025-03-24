@@ -41,6 +41,8 @@ tap-aptify = 'tap_aptify.tap:Tapaptify.cli'
 dev = [
     "pytest>=8",
     "singer-sdk[testing]~=0.44.3",
+    "pyodbc",
+    "pendulum"
 ]
 
 [tool.pytest.ini_options]

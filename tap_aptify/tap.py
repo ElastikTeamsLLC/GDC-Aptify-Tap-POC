@@ -1,4 +1,5 @@
 from singer_sdk import SQLConnector, SQLTap, SQLStream
+from singer_sdk import typing as th  # JSON schema typing helpers
 from singer_sdk.typing import PropertiesList, Property, StringType, BooleanType, ObjectType, DateTimeType, IntegerType
 from .client import aptifyConnector, aptifyStream
 
@@ -8,7 +9,7 @@ class Tapaptify(SQLTap):
     name = "tap-aptify"
     default_stream_class = aptifyStream
     default_connector_class = aptifyConnector
-    _tap_connector = None  # Instance variable to store the connector
+    _tap_connector = None
 
     @property
     def tap_connector(self) -> SQLConnector:
@@ -42,34 +43,134 @@ class Tapaptify(SQLTap):
         self._catalog_dict = result
         return self._catalog_dict
 
-    config_jsonschema = PropertiesList(
-        Property("dialect", StringType, default="mssql", description="The Dialect of SQLAlchemy", required=True),
-        Property("driver_type", StringType, default="pyodbc", description="The Python Driver to use for SQL connection", required=True),
-        Property("host", StringType, description="FQDN of the SQL server", required=True),
-        Property("port", StringType, description="Port for SQL connection"),  # Changed to StringType
-        Property("database", StringType, description="Database name", required=True),
-        Property("user", StringType, description="User with SQL access", required=True),
-        Property("password", StringType, secret=True, description="Password for the user", required=True),
-        Property("sqlalchemy_eng_params", ObjectType(
-            Property("fast_executemany", StringType, description="Fast Executemany Mode: True, False"),
-            Property("future", StringType, description="Run the engine in 2.0 mode: True, False")
-        ), description="SQLAlchemy Engine Parameters: fast_executemany, future"),
-        Property("sqlalchemy_url_query", ObjectType(
-            Property("driver", StringType, description="The Driver to use when connecting"),
-            Property("TrustServerCertificate", StringType, description="This is a Yes No option")
-        ), description="SQLAlchemy URL Query options: driver, TrustServerCertificate"),
-        Property("batch_config", ObjectType(
-            Property("encoding", ObjectType(
-                Property("format", StringType, description="Currently the only format is jsonl"),
-                Property("compression", StringType, description="Currently the only compression option is gzip")
-            )),
-            Property("storage", ObjectType(
-                Property("root", StringType, description="Directory for batch messages, e.g., file://test/batches"),
-                Property("prefix", StringType, description="Prefix for batch messages, e.g., test-batch-")
-            ))
-        ), description="Optional Batch Message configuration"),
-        Property("start_date", DateTimeType, description="Earliest record date for incremental sync"),
-        Property("hd_jsonschema_types", BooleanType, default=False, description="Turn on Higher Defined(HD) JSON Schema types to assist Targets")
+    config_jsonschema = th.PropertiesList(
+        th.Property(
+            "dialect",
+            th.StringType,
+            description="The Dialect of SQLAlchamey",
+            required=True,
+            allowed_values=["mssql"],
+            default="mssql"
+        ),
+        th.Property(
+            "driver_type",
+            th.StringType,
+            description="The Python Driver you will be using to connect to the SQL server",
+            required=True,
+            allowed_values=["pyodbc"],
+            default="pyodbc"
+        ),
+        th.Property(
+            "host",
+            th.StringType,
+            description="The FQDN of the Host serving out the SQL Instance",
+            required=True
+        ),
+        th.Property(
+            "port",
+            th.StringType,
+            description="The port on which SQL awaiting connection"
+        ),
+        th.Property(
+            "user",
+            th.StringType,
+            description="The User Account who has been granted access to the SQL Server",
+            required=True
+        ),
+        th.Property(
+            "password",
+            th.StringType,
+            description="The Password for the User account",
+            required=True,
+            secret=True
+        ),
+        th.Property(
+            "database",
+            th.StringType,
+            description="The Default database for this connection",
+            required=True
+        ),
+        th.Property(
+            "sqlalchemy_eng_params",
+            th.ObjectType(
+                th.Property(
+                    "fast_executemany",
+                    th.StringType,
+                    description="Fast Executemany Mode: True, False"
+                ),
+                th.Property(
+                    "future",
+                    th.StringType,
+                    description="Run the engine in 2.0 mode: True, False"
+                )
+            ),
+            description="SQLAlchemy Engine Paramaters: fast_executemany, future"
+        ),
+        th.Property(
+            "sqlalchemy_url_query",
+            th.ObjectType(
+                th.Property(
+                    "driver",
+                    th.StringType,
+                    description="The Driver to use when connection should match the Driver Type"
+                ),
+                th.Property(
+                    "TrustServerCertificate",
+                    th.StringType,
+                    description="This is a Yes No option"
+                )
+            ),
+            description="SQLAlchemy URL Query options: driver, TrustServerCertificate"
+        ),
+        th.Property(
+            "batch_config",
+            th.ObjectType(
+                th.Property(
+                    "encoding",
+                    th.ObjectType(
+                        th.Property(
+                            "format",
+                            th.StringType,
+                            description="Currently the only format is jsonl",
+                        ),
+                        th.Property(
+                            "compression",
+                            th.StringType,
+                            description="Currently the only compression options is gzip",
+                        )
+                    )
+                ),
+                th.Property(
+                    "storage",
+                    th.ObjectType(
+                        th.Property(
+                            "root",
+                            th.StringType,
+                            description="the directory you want batch messages to be placed in\n"\
+                                        "example: file://test/batches",
+                        ),
+                        th.Property(
+                            "prefix",
+                            th.StringType,
+                            description="What prefix you want your messages to have\n"\
+                                        "example: test-batch-",
+                        )
+                    )
+                )
+            ),
+            description="Optional Batch Message configuration",
+        ),
+        th.Property(
+            "start_date",
+            th.DateTimeType,
+            description="The earliest record date to sync"
+        ),
+        th.Property(
+            "hd_jsonschema_types",
+            th.BooleanType,
+            default=False,
+            description="Turn on Higher Defined(HD) JSON Schema types to assist Targets"
+        ),
     ).to_dict()
 
     def discover_streams(self) -> list[SQLStream]:

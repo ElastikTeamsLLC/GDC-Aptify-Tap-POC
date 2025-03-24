@@ -1,7 +1,4 @@
-"""SQL client handling.
 
-This includes mssqlStream and mssqlConnector.
-"""
 from __future__ import annotations
 
 import gzip
@@ -33,8 +30,7 @@ class aptifyConnector(SQLConnector):
             sqlalchemy_url: str | None = None
          ) -> None:
         """Class Default Init"""
-        # If pyodbc given set pyodbc.pooling to False
-        # This allows SQLA to manage to connection pool
+
         if config.get('driver_type') == 'pyodbc':
             pyodbc.pooling = False
 
@@ -60,13 +56,12 @@ class aptifyConnector(SQLConnector):
         )
 
         if 'port' in config:
-            config_url = config_url.set(port=config.get('port'))
+            config_url = config_url.set(port=1433)
 
-        # Add the driver specification and SSL settings to the URL query parameters
         driver_query = {
             "driver": "ODBC Driver 18 for SQL Server",
-            "TrustServerCertificate": "yes",  # Add this to trust the server certificate
-            "Encrypt": "yes"                  # Ensure encryption is enabled
+            "TrustServerCertificate": "yes",
+            "Encrypt": "yes"
         }
         
         if 'sqlalchemy_url_query' in config:
@@ -154,9 +149,6 @@ class aptifyConnector(SQLConnector):
         if str(from_type) in ["MONEY", "SMALLMONEY"]:
             from_type = "number"
 
-        # This is a MSSQL only DataType
-        # SQLA does the converion from 0,1
-        # to Python True, False
         if str(from_type) in ['BIT']:
             from_type = "bool"
         
@@ -184,7 +176,6 @@ class aptifyConnector(SQLConnector):
         Returns:
             A compatible JSON Schema type definition.
         """
-        # This is taken from to_jsonschema_type() in typing.py
         if isinstance(from_type, str):
             sql_type_name = from_type
         elif isinstance(from_type, sqlalchemy.types.TypeEngine):
@@ -198,7 +189,6 @@ class aptifyConnector(SQLConnector):
                 "Expected `str` or a SQLAlchemy `TypeEngine` object or type."
              )
 
-        # Add in the length of the
         if sql_type_name in ['CHAR', 'NCHAR', 'VARCHAR', 'NVARCHAR']:
             maxLength: int = getattr(from_type, 'length')
 
@@ -240,13 +230,10 @@ class aptifyConnector(SQLConnector):
                     "contentEncoding": "base64",
                 }
 
-        # This is a MSSQL only DataType
-        # SQLA does the converion from 0,1
-        # to Python True, False
+
         if sql_type_name == 'BIT':
             return {"type": ["boolean"]}
 
-        # This is a MSSQL only DataType
         if sql_type_name == 'TINYINT':
             return {
                 "type": ["integer"],
@@ -275,9 +262,6 @@ class aptifyConnector(SQLConnector):
                 "maximum": 9223372036854775807
             }
 
-        # Checks for the MSSQL type of NUMERIC and DECIMAL
-        #     if scale = 0 it is typed as a INTEGER
-        #     if scale != 0 it is typed as NUMBER
         if sql_type_name in ("NUMERIC", "DECIMAL"):
             precision: int = getattr(from_type, 'precision')
             scale: int = getattr(from_type, 'scale')
@@ -316,7 +300,6 @@ class aptifyConnector(SQLConnector):
                         "maximum": float(maximum_scientific_format)
                     }
 
-        # This is a MSSQL only DataType
         if sql_type_name == "SMALLMONEY":
             return {
                 "type": ["number"],
@@ -324,8 +307,6 @@ class aptifyConnector(SQLConnector):
                 "maximum": 214748.3647
             }
 
-        # This is a MSSQL only DataType
-        # The min and max are getting truncated catalog
         if sql_type_name == "MONEY":
             return {
                 "type": ["number"],
@@ -412,28 +393,21 @@ class aptifyConnector(SQLConnector):
 class CustomJSONEncoder(json.JSONEncoder):
     """Custom class extends json.JSONEncoder"""
 
-    # Override default() method
     def default(self, obj):
 
-        # Datetime in ISO format
         if isinstance(obj, datetime.datetime):
             return pendulum.instance(obj).isoformat()
 
-        # Date in ISO format
         if isinstance(obj, datetime.date):
             return obj.isoformat()
 
-        # Time in ISO format truncated to the second to pass
-        # json-schema validation
+
         if isinstance(obj, datetime.time):
             return obj.isoformat(timespec='seconds')
 
-        # JSON Encoder doesn't know Decimals but it
-        # does know float so we convert Decimal to float
         if isinstance(obj, Decimal):
             return float(obj)
         
-        # Default behavior for all other types
         return super().default(obj)
 
 class JSONLinesBatcher(BaseBatcher):
@@ -465,7 +439,6 @@ class JSONLinesBatcher(BaseBatcher):
         ):
             filename = f"{prefix}{sync_id}-{i}.json.gz"
             with self.batch_config.storage.fs(create=True) as fs:
-                # TODO: Determine compression from config.
                 with fs.open(filename, "wb") as f, gzip.GzipFile(
                     fileobj=f,
                     mode="wb",
@@ -487,7 +460,7 @@ class aptifyStream(SQLStream):
     def post_process(
         self,
         row: dict,
-        context: dict | None = None,  # noqa: ARG002
+        context: dict | None = None,
     ) -> dict | None:
         """As needed, append or transform raw data to match expected structure.
 
@@ -506,22 +479,16 @@ class aptifyStream(SQLStream):
         Returns:
             The resulting record dict, or `None` if the record should be excluded.
         """
-        # We change the name to record so when the change breaking
-        # change from row to record is done in SDK 1.0 the edits
-        # to accomidate the swithc will be two
+
         record: dict = row
 
-        # Get the Stream Properties Dictornary from the Schema
         properties: dict = self.schema.get('properties')
 
         for key, value in record.items():
             if value is not None:
-                # Get the Item/Column property
                 property_schema: dict = properties.get(key)
-                # Date in ISO format
                 if isinstance(value, datetime.date):
                     record.update({key: value.isoformat()})
-                # Encode base64 binary fields in the record
                 if property_schema.get('contentEncoding') == 'base64':
                     record.update({key: b64encode(value).decode()})
 
