@@ -1,4 +1,5 @@
 pendulum
 pyodbc
+pymssql
 singer-sdk~=0.44.3
 qlalchemy~=2.0.36

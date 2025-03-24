@@ -11,7 +11,7 @@ from uuid import uuid4
 from typing import Any, Iterable, Iterator
 
 import pendulum
-import pyodbc
+# import pyodbc
 import pymssql
 import sqlalchemy
 
