@@ -60,8 +60,8 @@ class Tapaptify(SQLTap):
             th.StringType,
             description="The Python Driver you will be using to connect to the SQL server",
             required=True,
-            allowed_values=["pymssql"],
-            default="pymssql"
+            allowed_values=["pyodbc"],
+            default="pyodbc"
         ),
         th.Property(
             "host",
