@@ -30,21 +30,17 @@ class aptifyConnector(SQLConnector):
          ) -> None:
         """Class Default Init
 
-        If pyodbc is used, disable its pooling so that SQLAlchemy can manage it.
+        If pyodbc is used, disable its pooling so SQLAlchemy manages it.
         """
         if config.get('driver_type') == 'pyodbc':
             pyodbc.pooling = False
-
         super().__init__(config, sqlalchemy_url)
 
     def get_sqlalchemy_url(self, config: dict) -> str:
         """Return the SQLAlchemy URL string.
 
-        Args:
-            config: A dictionary of settings from the tap or target config.
-
-        Returns:
-            The URL as a string.
+        Builds a URL using the provided config and adds the required
+        driver and SSL query parameters.
         """
         url_drivername = f"{config.get('dialect', 'mssql')}+{config.get('driver_type', 'pyodbc')}"
         config_url = URL.create(
@@ -58,27 +54,20 @@ class aptifyConnector(SQLConnector):
         if 'port' in config:
             config_url = config_url.set(port=config.get('port'))
 
-        # Add the driver specification and SSL settings to the URL query parameters
         driver_query = {
-            "driver": "ODBC Driver 18 for SQL Server",
-            "TrustServerCertificate": "yes",  # Trust the server certificate
-            "Encrypt": "yes"                  # Ensure encryption is enabled
+            "driver": "ODBC Driver 17 for SQL Server",
+            "TrustServerCertificate": "yes",
+            "Encrypt": "yes"
         }
-        
         if 'sqlalchemy_url_query' in config:
             driver_query.update(config.get('sqlalchemy_url_query'))
-        
         config_url = config_url.update_query_dict(driver_query)
-
         return str(config_url)
 
     def create_engine(self) -> Engine:
         """Return a new SQLAlchemy engine using the provided config.
 
-        Developers can generally override one of: `sqlalchemy_engine` or `sqlalchemy_url`.
-
-        Returns:
-            A newly created SQLAlchemy engine object.
+        Uses engine configuration parameters to create an engine.
         """
         eng_prefix = "ep."
         eng_config = {
@@ -94,20 +83,11 @@ class aptifyConnector(SQLConnector):
 
     def to_jsonschema_type(
             self,
-            from_type: str
-            | sqlalchemy.types.TypeEngine
-            | type[sqlalchemy.types.TypeEngine],
+            from_type: str | sqlalchemy.types.TypeEngine | type[sqlalchemy.types.TypeEngine],
     ) -> dict:
         """Returns a JSON Schema equivalent for the given SQL type.
 
-        Developers may optionally add custom logic before calling the
-        default implementation inherited from the base class.
-
-        Args:
-            from_type: The SQL type as a string or as a TypeEngine.
-
-        Returns:
-            A compatible JSON Schema type definition.
+        Delegates to HD conversion if enabled in the config.
         """
         if self.config.get('hd_jsonschema_types', False):
             return self.hd_to_jsonschema_type(from_type)
@@ -116,20 +96,11 @@ class aptifyConnector(SQLConnector):
 
     @staticmethod
     def org_to_jsonschema_type(
-        from_type: str
-        | sqlalchemy.types.TypeEngine
-        | type[sqlalchemy.types.TypeEngine],
+        from_type: str | sqlalchemy.types.TypeEngine | type[sqlalchemy.types.TypeEngine],
     ) -> dict:
-        """Returns a JSON Schema equivalent for the given SQL type.
+        """Returns a JSON Schema equivalent for the given SQL type (standard conversion).
 
-        Checks for the MSSQL type of NUMERIC:
-            if scale = 0 then integer; else number.
-
-        Args:
-            from_type: The SQL type as a string or as a TypeEngine.
-
-        Returns:
-            A compatible JSON Schema type definition.
+        Handles MSSQL-specific types such as NUMERIC, MONEY, and BIT.
         """
         if str(from_type).startswith("NUMERIC"):
             if str(from_type).endswith(", 0)"):
@@ -140,7 +111,6 @@ class aptifyConnector(SQLConnector):
         if str(from_type) in ["MONEY", "SMALLMONEY"]:
             from_type = "number"
 
-        # MSSQL DataType: BIT is converted from 0,1 to Python True, False
         if str(from_type) in ['BIT']:
             from_type = "bool"
         
@@ -148,20 +118,11 @@ class aptifyConnector(SQLConnector):
 
     @staticmethod
     def hd_to_jsonschema_type(
-        from_type: str
-        | sqlalchemy.types.TypeEngine
-        | type[sqlalchemy.types.TypeEngine],
+        from_type: str | sqlalchemy.types.TypeEngine | type[sqlalchemy.types.TypeEngine],
     ) -> dict:
-        """Returns a JSON Schema equivalent for the given SQL type with HD details.
+        """Returns a JSON Schema equivalent for the given SQL type (HD conversion).
 
-        Args:
-            from_type: The SQL type as a string or as a TypeEngine.
-
-        Raises:
-            ValueError: If `from_type` is not of type `str` or `TypeEngine`.
-
-        Returns:
-            A compatible JSON Schema type definition.
+        Provides more detailed schema definitions for MSSQL-specific types.
         """
         if isinstance(from_type, str):
             sql_type_name = from_type
@@ -175,83 +136,44 @@ class aptifyConnector(SQLConnector):
         if sql_type_name in ['CHAR', 'NCHAR', 'VARCHAR', 'NVARCHAR']:
             maxLength: int = getattr(from_type, 'length', None)
             if getattr(from_type, 'length', None):
-                return {
-                    "type": ["string"],
-                    "maxLength": maxLength
-                }
+                return {"type": ["string"], "maxLength": maxLength}
 
         if sql_type_name == 'TIME':
-            return {
-                "type": ["string"],
-                "format": "time"
-            }
+            return {"type": ["string"], "format": "time"}
 
         if sql_type_name == 'UNIQUEIDENTIFIER':
-            return {
-                "type": ["string"],
-                "format": "uuid"
-            }
+            return {"type": ["string"], "format": "uuid"}
 
         if sql_type_name == 'XML':
-            return {
-                "type": ["string"],
-                "contentMediaType": "application/xml",
-            }
+            return {"type": ["string"], "contentMediaType": "application/xml"}
 
         if sql_type_name in ['BINARY', 'IMAGE', 'VARBINARY']:
             maxLength: int = getattr(from_type, 'length', None)
             if getattr(from_type, 'length', None):
-                return {
-                    "type": ["string"],
-                    "contentEncoding": "base64",
-                    "maxLength": maxLength
-                }
+                return {"type": ["string"], "contentEncoding": "base64", "maxLength": maxLength}
             else:
-                return {
-                    "type": ["string"],
-                    "contentEncoding": "base64",
-                }
+                return {"type": ["string"], "contentEncoding": "base64"}
 
         if sql_type_name == 'BIT':
             return {"type": ["boolean"]}
 
         if sql_type_name == 'TINYINT':
-            return {
-                "type": ["integer"],
-                "minimum": 0,
-                "maximum": 255
-            }
+            return {"type": ["integer"], "minimum": 0, "maximum": 255}
 
         if sql_type_name == 'SMALLINT':
-            return {
-                "type": ["integer"],
-                "minimum": -32768,
-                "maximum": 32767
-            }
+            return {"type": ["integer"], "minimum": -32768, "maximum": 32767}
 
         if sql_type_name == 'INTEGER':
-            return {
-                "type": ["integer"],
-                "minimum": -2147483648,
-                "maximum": 2147483647
-            }
+            return {"type": ["integer"], "minimum": -2147483648, "maximum": 2147483647}
 
         if sql_type_name == 'BIGINT':
-            return {
-                "type": ["integer"],
-                "minimum": -9223372036854775808,
-                "maximum": 9223372036854775807
-            }
+            return {"type": ["integer"], "minimum": -9223372036854775808, "maximum": 9223372036854775807}
 
         if sql_type_name in ("NUMERIC", "DECIMAL"):
             precision: int = getattr(from_type, 'precision', None)
             scale: int = getattr(from_type, 'scale', None)
             if scale == 0:
-                return {
-                    "type": ["integer"],
-                    "minimum": (-pow(10, precision)) + 1,
-                    "maximum": (pow(10, precision)) - 1
-                }
+                return {"type": ["integer"], "minimum": (-pow(10, precision)) + 1, "maximum": (pow(10, precision)) - 1}
             else:
                 maximum_as_number = ""
                 minimum_as_number: str = "-"
@@ -269,60 +191,27 @@ class aptifyConnector(SQLConnector):
                 minimum_scientific_format += maximum_scientific_format
 
                 if "e+" not in str(float(maximum_as_number)):
-                    return {
-                        "type": ["number"],
-                        "minimum": float(minimum_as_number),
-                        "maximum": float(maximum_as_number)
-                    }
+                    return {"type": ["number"], "minimum": float(minimum_as_number), "maximum": float(maximum_as_number)}
                 else:
-                    return {
-                        "type": ["number"],
-                        "minimum": float(minimum_scientific_format),
-                        "maximum": float(maximum_scientific_format)
-                    }
+                    return {"type": ["number"], "minimum": float(minimum_scientific_format), "maximum": float(maximum_scientific_format)}
 
         if sql_type_name == "SMALLMONEY":
-            return {
-                "type": ["number"],
-                "minimum": -214748.3648,
-                "maximum": 214748.3647
-            }
+            return {"type": ["number"], "minimum": -214748.3648, "maximum": 214748.3647}
 
         if sql_type_name == "MONEY":
-            return {
-                "type": ["number"],
-                "minimum": -922337203685477.5808,
-                "maximum": 922337203685477.5807
-            }
+            return {"type": ["number"], "minimum": -922337203685477.5808, "maximum": 922337203685477.5807}
 
         if sql_type_name == "FLOAT":
-            return {
-                "type": ["number"],
-                "minimum": -1.79e308,
-                "maximum": 1.79e308
-            }
+            return {"type": ["number"], "minimum": -1.79e308, "maximum": 1.79e308}
 
         if sql_type_name == "REAL":
-            return {
-                "type": ["number"],
-                "minimum": -3.40e38,
-                "maximum": 3.40e38
-            }
+            return {"type": ["number"], "minimum": -3.40e38, "maximum": 3.40e38}
 
         return SQLConnector.to_jsonschema_type(from_type)
 
     @staticmethod
     def to_sql_type(jsonschema_type: dict) -> sqlalchemy.types.TypeEngine:
-        """Return a SQLAlchemy type representation of the provided JSON Schema type.
-
-        Developers may override this method to support non-standard types.
-        
-        Args:
-            jsonschema_type: The JSON Schema representation of the source type.
-        
-        Returns:
-            The SQLAlchemy type representation of the data type.
-        """
+        """Return a SQLAlchemy type representation of the provided JSON Schema type."""
         return SQLConnector.to_sql_type(jsonschema_type)
     
     @staticmethod
@@ -332,34 +221,16 @@ class aptifyConnector(SQLConnector):
         db_name: str | None = None,
         delimiter: str = ".",
     ) -> str:
-        """Concatenates a fully qualified name from the parts.
-
-        Args:
-            table_name: The name of the table.
-            schema_name: The name of the schema. Defaults to None.
-            db_name: The name of the database. Defaults to None.
-            delimiter: Generally: '.' for SQL names and '-' for Singer names.
-
-        Raises:
-            ValueError: If table_name is not provided.
-        
-        Returns:
-            The fully qualified name as a string.
-        """
+        """Concatenates a fully qualified name from the parts."""
         parts = []
         if table_name:
             parts.append(table_name)
         if not parts:
-            raise ValueError(
-                "Could not generate fully qualified name: " +
-                ":".join([table_name or "(unknown-table-name)"])
-            )
+            raise ValueError("Could not generate fully qualified name: " + (table_name or "(unknown-table-name)"))
         return table_name
 
 
 class CustomJSONEncoder(json.JSONEncoder):
-    """Custom class extends json.JSONEncoder"""
-
     def default(self, obj):
         if isinstance(obj, datetime.datetime):
             return pendulum.instance(obj).isoformat()
@@ -373,39 +244,18 @@ class CustomJSONEncoder(json.JSONEncoder):
 
 
 class JSONLinesBatcher(BaseBatcher):
-    """JSON Lines Record Batcher."""
-
     encoder_class = CustomJSONEncoder
 
     def get_batches(
         self,
         records: Iterator[dict],
     ) -> Iterator[list[str]]:
-        """Yield manifest of batches.
-
-        Args:
-            records: The records to batch.
-
-        Yields:
-            A list of file paths (called a manifest).
-        """
         sync_id = f"{self.tap_name}--{self.stream_name}-{uuid4()}"
         prefix = self.batch_config.storage.prefix or ""
-
-        for i, chunk in enumerate(
-            lazy_chunked_generator(
-                records,
-                self.batch_config.batch_size,
-            ),
-            start=1,
-        ):
+        for i, chunk in enumerate(lazy_chunked_generator(records, self.batch_config.batch_size), start=1):
             filename = f"{prefix}{sync_id}-{i}.json.gz"
             with self.batch_config.storage.fs(create=True) as fs:
-                # TODO: Determine compression from config.
-                with fs.open(filename, "wb") as f, gzip.GzipFile(
-                    fileobj=f,
-                    mode="wb",
-                ) as gz:
+                with fs.open(filename, "wb") as f, gzip.GzipFile(fileobj=f, mode="wb") as gz:
                     gz.writelines(
                         (json.dumps(record, cls=self.encoder_class, default=str) + "\n").encode()
                         for record in chunk
@@ -422,23 +272,11 @@ class aptifyStream(SQLStream):
     def post_process(
         self,
         row: dict,
-        context: dict | None = None,  # noqa: ARG002
+        context: dict | None = None,
     ) -> dict | None:
-        """As needed, append or transform raw data to match expected structure.
-
-        This method gives developers an opportunity to "clean up" the results
-        prior to returning records to the downstream tap.
-        
-        Args:
-            row: Individual record in the stream.
-            context: Stream partition or context dictionary.
-        
-        Returns:
-            The resulting record dict, or `None` if the record should be excluded.
-        """
+        """Append or transform raw data to match expected structure."""
         record: dict = row
         properties: dict = self.schema.get('properties')
-
         for key, value in record.items():
             if value is not None:
                 property_schema: dict = properties.get(key)
@@ -446,36 +284,18 @@ class aptifyStream(SQLStream):
                     record.update({key: value.isoformat()})
                 if property_schema.get('contentEncoding') == 'base64':
                     record.update({key: b64encode(value).decode()})
-
         return record
 
     def get_records(self, context: dict | None) -> Iterable[dict[str, Any]]:
-        """Return a generator of record-type dictionary objects.
-
-        If the stream has a replication_key, records will be sorted by that key.
-        If a starting bookmark exists, records will be filtered accordingly.
-
-        Args:
-            context: If provided, specifies the data slice to read from.
-        
-        Yields:
-            One dict per record.
-        
-        Raises:
-            NotImplementedError: If partitioning is provided but not supported.
-        """
+        """Yield one dict per record from the source."""
         if context:
-            raise NotImplementedError(
-                f"Stream '{self.name}' does not support partitioning.",
-            )
-
+            raise NotImplementedError(f"Stream '{self.name}' does not support partitioning.")
         selected_column_names = self.get_selected_schema()["properties"].keys()
         table = self.connector.get_table(
             full_table_name=self.fully_qualified_name,
             column_names=selected_column_names,
         )
         query = table.select()
-
         if self.replication_key:
             replication_key_col = table.columns[self.replication_key]
             query = query.order_by(replication_key_col)
@@ -485,10 +305,8 @@ class aptifyStream(SQLStream):
                 start_val = self.get_starting_replication_key_value(context)
             if start_val:
                 query = query.where(replication_key_col >= start_val)
-
         if self.ABORT_AT_RECORD_COUNT is not None:
             query = query.limit(self.ABORT_AT_RECORD_COUNT + 1)
-
         with self.connector._connect() as conn:
             for record in conn.execute(query):
                 transformed_record = self.post_process(dict(record._mapping))

@@ -14,32 +14,21 @@ class Tapaptify(SQLTap):
 
     @property
     def tap_connector(self) -> SQLConnector:
-        """The connector object.
-
-        Returns:
-            The connector object.
-        """
+        """Return the connector object."""
         if self._tap_connector is None:
             self._tap_connector = self.default_connector_class(dict(self.config))
         return self._tap_connector
 
     @property
     def catalog_dict(self) -> dict:
-        """Get catalog dictionary.
-
-        Returns:
-            The tap's catalog as a dict.
-        """
+        """Get catalog dictionary."""
         if self._catalog_dict:
             return self._catalog_dict
-
         if self.input_catalog:
             return self.input_catalog.to_dict()
-
         connector = self.tap_connector
         result: dict[str, list[dict]] = {"streams": []}
         result["streams"].extend(connector.discover_catalog_entries())
-
         self._catalog_dict = result
         return self._catalog_dict
 
@@ -55,7 +44,7 @@ class Tapaptify(SQLTap):
         th.Property(
             "driver_type",
             th.StringType,
-            description="The Python Driver you will be using to connect to the SQL server",
+            description="The Python Driver to connect to the SQL server",
             required=True,
             allowed_values=["pyodbc"],
             default="pyodbc"
@@ -63,18 +52,18 @@ class Tapaptify(SQLTap):
         th.Property(
             "host",
             th.StringType,
-            description="The FQDN of the Host serving out the SQL Instance",
+            description="The FQDN of the SQL host",
             required=True
         ),
         th.Property(
             "port",
             th.StringType,
-            description="The port on which SQL is awaiting connection"
+            description="The port on which SQL awaits connection"
         ),
         th.Property(
             "user",
             th.StringType,
-            description="The User Account who has been granted access to the SQL Server",
+            description="The User account for SQL access",
             required=True
         ),
         th.Property(
@@ -87,7 +76,7 @@ class Tapaptify(SQLTap):
         th.Property(
             "database",
             th.StringType,
-            description="The Default database for this connection",
+            description="The default database for connection",
             required=True
         ),
         th.Property(
@@ -96,15 +85,15 @@ class Tapaptify(SQLTap):
                 th.Property(
                     "fast_executemany",
                     th.StringType,
-                    description="Fast Executemany Mode: True, False"
+                    description="Fast Executemany mode: True or False"
                 ),
                 th.Property(
                     "future",
                     th.StringType,
-                    description="Run the engine in 2.0 mode: True, False"
+                    description="Run engine in 2.0 mode: True or False"
                 )
             ),
-            description="SQLAlchemy Engine Parameters: fast_executemany, future"
+            description="SQLAlchemy Engine Parameters",
         ),
         th.Property(
             "sqlalchemy_url_query",
@@ -112,15 +101,15 @@ class Tapaptify(SQLTap):
                 th.Property(
                     "driver",
                     th.StringType,
-                    description="The Driver to use when connection should match the Driver Type"
+                    description="The driver to use for the connection"
                 ),
                 th.Property(
                     "TrustServerCertificate",
                     th.StringType,
-                    description="This is a Yes/No option"
+                    description="Yes or No"
                 )
             ),
-            description="SQLAlchemy URL Query options: driver, TrustServerCertificate"
+            description="SQLAlchemy URL Query options",
         ),
         th.Property(
             "batch_config",
@@ -131,12 +120,12 @@ class Tapaptify(SQLTap):
                         th.Property(
                             "format",
                             th.StringType,
-                            description="Currently the only format is jsonl",
+                            description="Currently only jsonl is supported",
                         ),
                         th.Property(
                             "compression",
                             th.StringType,
-                            description="Currently the only compression option is gzip",
+                            description="Currently only gzip is supported",
                         )
                     )
                 ),
@@ -146,12 +135,12 @@ class Tapaptify(SQLTap):
                         th.Property(
                             "root",
                             th.StringType,
-                            description="The directory where batch messages will be placed (e.g., file://test/batches)",
+                            description="Directory for batch messages (e.g., file://batches)",
                         ),
                         th.Property(
                             "prefix",
                             th.StringType,
-                            description="The prefix for your messages (e.g., test-batch-)",
+                            description="Prefix for batch messages (e.g., tap-batch-)",
                         )
                     )
                 )
@@ -167,16 +156,12 @@ class Tapaptify(SQLTap):
             "hd_jsonschema_types",
             th.BooleanType,
             default=False,
-            description="Turn on Higher Defined (HD) JSON Schema types to assist Targets"
+            description="Enable HD JSON Schema types"
         ),
     ).to_dict()
 
     def discover_streams(self) -> list[SQLStream]:
-        """Initialize all available streams and return them as a list.
-
-        Returns:
-            List of discovered Stream objects.
-        """
+        """Initialize and return all available streams."""
         result: list[SQLStream] = []
         for catalog_entry in self.catalog_dict["streams"]:
             result.append(
