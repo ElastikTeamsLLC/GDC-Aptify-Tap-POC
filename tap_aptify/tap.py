@@ -3,6 +3,7 @@ from singer_sdk import typing as th  # JSON schema typing helpers
 from singer_sdk.typing import PropertiesList, Property, StringType, BooleanType, ObjectType, DateTimeType, IntegerType
 from .client import aptifyConnector, aptifyStream
 
+
 class Tapaptify(SQLTap):
     """Singer tap for extracting data from an MSSQL (Azure SQL) database."""
 
@@ -21,13 +22,13 @@ class Tapaptify(SQLTap):
         if self._tap_connector is None:
             self._tap_connector = self.default_connector_class(dict(self.config))
         return self._tap_connector
-    
+
     @property
     def catalog_dict(self) -> dict:
         """Get catalog dictionary.
 
         Returns:
-            The tap's catalog as a dict
+            The tap's catalog as a dict.
         """
         if self._catalog_dict:
             return self._catalog_dict
@@ -36,7 +37,6 @@ class Tapaptify(SQLTap):
             return self.input_catalog.to_dict()
 
         connector = self.tap_connector
-
         result: dict[str, list[dict]] = {"streams": []}
         result["streams"].extend(connector.discover_catalog_entries())
 
@@ -47,7 +47,7 @@ class Tapaptify(SQLTap):
         th.Property(
             "dialect",
             th.StringType,
-            description="The Dialect of SQLAlchamey",
+            description="The Dialect of SQLAlchemy",
             required=True,
             allowed_values=["mssql"],
             default="mssql"
@@ -57,8 +57,8 @@ class Tapaptify(SQLTap):
             th.StringType,
             description="The Python Driver you will be using to connect to the SQL server",
             required=True,
-            allowed_values=["pymssql"],
-            default="pymssql"
+            allowed_values=["pyodbc"],
+            default="pyodbc"
         ),
         th.Property(
             "host",
@@ -69,13 +69,7 @@ class Tapaptify(SQLTap):
         th.Property(
             "port",
             th.StringType,
-            description="The port on which SQL awaiting connection",
-            default="1433"
-        ),
-        th.Property(
-            "connection_string",
-            th.StringType,
-            description="Full connection string for the database (optional)",
+            description="The port on which SQL is awaiting connection"
         ),
         th.Property(
             "user",
@@ -110,7 +104,23 @@ class Tapaptify(SQLTap):
                     description="Run the engine in 2.0 mode: True, False"
                 )
             ),
-            description="SQLAlchemy Engine Paramaters: fast_executemany, future"
+            description="SQLAlchemy Engine Parameters: fast_executemany, future"
+        ),
+        th.Property(
+            "sqlalchemy_url_query",
+            th.ObjectType(
+                th.Property(
+                    "driver",
+                    th.StringType,
+                    description="The Driver to use when connection should match the Driver Type"
+                ),
+                th.Property(
+                    "TrustServerCertificate",
+                    th.StringType,
+                    description="This is a Yes/No option"
+                )
+            ),
+            description="SQLAlchemy URL Query options: driver, TrustServerCertificate"
         ),
         th.Property(
             "batch_config",
@@ -126,7 +136,7 @@ class Tapaptify(SQLTap):
                         th.Property(
                             "compression",
                             th.StringType,
-                            description="Currently the only compression options is gzip",
+                            description="Currently the only compression option is gzip",
                         )
                     )
                 ),
@@ -136,14 +146,12 @@ class Tapaptify(SQLTap):
                         th.Property(
                             "root",
                             th.StringType,
-                            description="the directory you want batch messages to be placed in\n"\
-                                        "example: file://test/batches",
+                            description="The directory where batch messages will be placed (e.g., file://test/batches)",
                         ),
                         th.Property(
                             "prefix",
                             th.StringType,
-                            description="What prefix you want your messages to have\n"\
-                                        "example: test-batch-",
+                            description="The prefix for your messages (e.g., test-batch-)",
                         )
                     )
                 )
@@ -159,7 +167,7 @@ class Tapaptify(SQLTap):
             "hd_jsonschema_types",
             th.BooleanType,
             default=False,
-            description="Turn on Higher Defined(HD) JSON Schema types to assist Targets"
+            description="Turn on Higher Defined (HD) JSON Schema types to assist Targets"
         ),
     ).to_dict()
 
@@ -178,8 +186,8 @@ class Tapaptify(SQLTap):
                     connector=self.tap_connector
                 )
             )
-
         return result
+
 
 if __name__ == "__main__":
     Tapaptify.cli()
