@@ -35,22 +35,7 @@ s3 = [
 ]
 
 [project.scripts]
-# CLI declaration
-tap-aptify = 'tap_aptify.tap:Tapaptify.cli'
-
-[dependency-groups]
-dev = [
-    "pytest>=8",
-    "singer-sdk[testing]~=0.44.3",
-    "pyodbc==5.2.0",
-    "pendulum",
-    "pymssql==2.3.0"
-]
-
-[tool.pytest.ini_options]
-addopts = [
-    "--durations=10",
-]
+tap-aptify = "tap_aptify.tap:Tapaptify.cli"
 
 [tool.mypy]
 python_version = "3.12"
@@ -72,8 +57,22 @@ allow-star-arg-any = true
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
+[tool.pytest.ini_options]
+addopts = [
+    "--durations=10",
+]
+
 [build-system]
 requires = [
     "hatchling>=1,<2",
 ]
 build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "singer-sdk[testing]~=0.44.3",
+    "pyodbc==5.2.0",
+    "pendulum",
+    "pymssql==2.3.0"
+]

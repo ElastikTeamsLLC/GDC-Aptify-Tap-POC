@@ -1,34 +1,48 @@
-from singer_sdk import SQLConnector, SQLTap, SQLStream
+from __future__ import annotations
+
+from singer_sdk import SQLTap, SQLStream, SQLConnector
 from singer_sdk import typing as th  # JSON schema typing helpers
-from singer_sdk.typing import PropertiesList, Property, StringType, BooleanType, ObjectType, DateTimeType, IntegerType
-from .client import aptifyConnector, aptifyStream
+
+from tap_aptify.client import aptifyStream, aptifyConnector
 
 
 class Tapaptify(SQLTap):
-    """Singer tap for extracting data from an MSSQL (Azure SQL) database."""
+    """mssql tap class."""
 
     name = "tap-aptify"
     default_stream_class = aptifyStream
     default_connector_class = aptifyConnector
-    _tap_connector = None
+    _tap_connector: SQLConnector = None
 
     @property
     def tap_connector(self) -> SQLConnector:
-        """Return the connector object."""
+        """The connector object.
+
+        Returns:
+            The connector object.
+        """
         if self._tap_connector is None:
             self._tap_connector = self.default_connector_class(dict(self.config))
         return self._tap_connector
-
+    
     @property
     def catalog_dict(self) -> dict:
-        """Get catalog dictionary."""
+        """Get catalog dictionary.
+
+        Returns:
+            The tap's catalog as a dict
+        """
         if self._catalog_dict:
             return self._catalog_dict
+
         if self.input_catalog:
             return self.input_catalog.to_dict()
+
         connector = self.tap_connector
+
         result: dict[str, list[dict]] = {"streams": []}
         result["streams"].extend(connector.discover_catalog_entries())
+
         self._catalog_dict = result
         return self._catalog_dict
 
@@ -36,7 +50,7 @@ class Tapaptify(SQLTap):
         th.Property(
             "dialect",
             th.StringType,
-            description="The Dialect of SQLAlchemy",
+            description="The Dialect of SQLAlchamey",
             required=True,
             allowed_values=["mssql"],
             default="mssql"
@@ -44,7 +58,7 @@ class Tapaptify(SQLTap):
         th.Property(
             "driver_type",
             th.StringType,
-            description="The Python Driver to connect to the SQL server",
+            description="The Python Driver you will be using to connect to the SQL server",
             required=True,
             allowed_values=["pyodbc"],
             default="pyodbc"
@@ -52,18 +66,18 @@ class Tapaptify(SQLTap):
         th.Property(
             "host",
             th.StringType,
-            description="The FQDN of the SQL host",
+            description="The FQDN of the Host serving out the SQL Instance",
             required=True
         ),
         th.Property(
             "port",
             th.StringType,
-            description="The port on which SQL awaits connection"
+            description="The port on which SQL awaiting connection"
         ),
         th.Property(
             "user",
             th.StringType,
-            description="The User account for SQL access",
+            description="The User Account who has been granted access to the SQL Server",
             required=True
         ),
         th.Property(
@@ -76,7 +90,7 @@ class Tapaptify(SQLTap):
         th.Property(
             "database",
             th.StringType,
-            description="The default database for connection",
+            description="The Default database for this connection",
             required=True
         ),
         th.Property(
@@ -85,15 +99,15 @@ class Tapaptify(SQLTap):
                 th.Property(
                     "fast_executemany",
                     th.StringType,
-                    description="Fast Executemany mode: True or False"
+                    description="Fast Executemany Mode: True, False"
                 ),
                 th.Property(
                     "future",
                     th.StringType,
-                    description="Run engine in 2.0 mode: True or False"
+                    description="Run the engine in 2.0 mode: True, False"
                 )
             ),
-            description="SQLAlchemy Engine Parameters",
+            description="SQLAlchemy Engine Paramaters: fast_executemany, future"
         ),
         th.Property(
             "sqlalchemy_url_query",
@@ -101,15 +115,15 @@ class Tapaptify(SQLTap):
                 th.Property(
                     "driver",
                     th.StringType,
-                    description="The driver to use for the connection"
+                    description="The Driver to use when connection should match the Driver Type"
                 ),
                 th.Property(
                     "TrustServerCertificate",
                     th.StringType,
-                    description="Yes or No"
+                    description="This is a Yes No option"
                 )
             ),
-            description="SQLAlchemy URL Query options",
+            description="SQLAlchemy URL Query options: driver, TrustServerCertificate"
         ),
         th.Property(
             "batch_config",
@@ -120,12 +134,12 @@ class Tapaptify(SQLTap):
                         th.Property(
                             "format",
                             th.StringType,
-                            description="Currently only jsonl is supported",
+                            description="Currently the only format is jsonl",
                         ),
                         th.Property(
                             "compression",
                             th.StringType,
-                            description="Currently only gzip is supported",
+                            description="Currently the only compression options is gzip",
                         )
                     )
                 ),
@@ -135,12 +149,14 @@ class Tapaptify(SQLTap):
                         th.Property(
                             "root",
                             th.StringType,
-                            description="Directory for batch messages (e.g., file://batches)",
+                            description="the directory you want batch messages to be placed in\n"\
+                                        "example: file://test/batches",
                         ),
                         th.Property(
                             "prefix",
                             th.StringType,
-                            description="Prefix for batch messages (e.g., tap-batch-)",
+                            description="What prefix you want your messages to have\n"\
+                                        "example: test-batch-",
                         )
                     )
                 )
@@ -156,12 +172,16 @@ class Tapaptify(SQLTap):
             "hd_jsonschema_types",
             th.BooleanType,
             default=False,
-            description="Enable HD JSON Schema types"
+            description="Turn on Higher Defined(HD) JSON Schema types to assist Targets"
         ),
     ).to_dict()
 
     def discover_streams(self) -> list[SQLStream]:
-        """Initialize and return all available streams."""
+        """Initialize all available streams and return them as a list.
+
+        Returns:
+            List of discovered Stream objects.
+        """
         result: list[SQLStream] = []
         for catalog_entry in self.catalog_dict["streams"]:
             result.append(
@@ -171,8 +191,8 @@ class Tapaptify(SQLTap):
                     connector=self.tap_connector
                 )
             )
-        return result
 
+        return result
 
 if __name__ == "__main__":
     Tapaptify.cli()
