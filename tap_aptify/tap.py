@@ -57,8 +57,8 @@ class Tapaptify(SQLTap):
             th.StringType,
             description="The Python Driver you will be using to connect to the SQL server",
             required=True,
-            allowed_values=["pyodbc"],
-            default="pyodbc"
+            allowed_values=["pymssql"],
+            default="pymssql"
         ),
         th.Property(
             "host",
@@ -69,7 +69,8 @@ class Tapaptify(SQLTap):
         th.Property(
             "port",
             th.StringType,
-            description="The port on which SQL awaiting connection"
+            description="The port on which SQL awaiting connection",
+            default=1433
         ),
         th.Property(
             "user",
@@ -105,22 +106,6 @@ class Tapaptify(SQLTap):
                 )
             ),
             description="SQLAlchemy Engine Paramaters: fast_executemany, future"
-        ),
-        th.Property(
-            "sqlalchemy_url_query",
-            th.ObjectType(
-                th.Property(
-                    "driver",
-                    th.StringType,
-                    description="The Driver to use when connection should match the Driver Type"
-                ),
-                th.Property(
-                    "TrustServerCertificate",
-                    th.StringType,
-                    description="This is a Yes No option"
-                )
-            ),
-            description="SQLAlchemy URL Query options: driver, TrustServerCertificate"
         ),
         th.Property(
             "batch_config",

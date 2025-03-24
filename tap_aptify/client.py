@@ -12,6 +12,7 @@ from typing import Any, Iterable, Iterator
 
 import pendulum
 import pyodbc
+import pymssql
 import sqlalchemy
 
 from sqlalchemy.engine import Engine
@@ -28,16 +29,13 @@ class aptifyConnector(SQLConnector):
             self,
             config: dict | None = None,
             sqlalchemy_url: str | None = None
-         ) -> None:
+    ) -> None:
         """Class Default Init"""
-
-        if config.get('driver_type') == 'pyodbc':
-            pyodbc.pooling = False
-
         super().__init__(config, sqlalchemy_url)
 
+    @classmethod
     def get_sqlalchemy_url(cls, config: dict) -> str:
-        """Return the SQLAlchemy URL string.
+        """Return the SQLAlchemy URL string for pymssql.
 
         Args:
             config: A dictionary of settings from the tap or target config.
@@ -45,8 +43,7 @@ class aptifyConnector(SQLConnector):
         Returns:
             The URL as a string.
         """
-        url_drivername = f"{config.get('dialect', 'mssql')}+{config.get('driver_type', 'pyodbc')}"
-        
+        url_drivername = "mssql+pymssql"
         config_url = URL.create(
             url_drivername,
             username=config.get('user'),
@@ -56,41 +53,17 @@ class aptifyConnector(SQLConnector):
         )
 
         if 'port' in config:
-            config_url = config_url.set(port=1433)
-
-        driver_query = {
-            "driver": "ODBC Driver 18 for SQL Server",
-            "TrustServerCertificate": "yes",
-            "Encrypt": "yes"
-        }
-        
-        if 'sqlalchemy_url_query' in config:
-            driver_query.update(config.get('sqlalchemy_url_query'))
-        
-        config_url = config_url.update_query_dict(driver_query)
+            config_url = config_url.set(port=config.get('port', 1433))
 
         return str(config_url)
 
     def create_engine(self) -> Engine:
         """Return a new SQLAlchemy engine using the provided config.
 
-        Developers can generally override just one of the following:
-        `sqlalchemy_engine`, sqlalchemy_url`.
-
         Returns:
             A newly created SQLAlchemy engine object.
         """
-        eng_prefix = "ep."
-        eng_config = {
-            f"{eng_prefix}url": self.sqlalchemy_url,
-            f"{eng_prefix}echo": "False"
-        }
-
-        if self.config.get('sqlalchemy_eng_params'):
-            for key, value in self.config['sqlalchemy_eng_params'].items():
-                eng_config.update({f"{eng_prefix}{key}": value})
-
-        return sqlalchemy.engine_from_config(eng_config, prefix=eng_prefix)
+        return sqlalchemy.create_engine(self.sqlalchemy_url)
 
     def to_jsonschema_type(
             self,
