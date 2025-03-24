@@ -70,7 +70,12 @@ class Tapaptify(SQLTap):
             "port",
             th.StringType,
             description="The port on which SQL awaiting connection",
-            default=1433
+            default="1433"
+        ),
+        th.Property(
+            "connection_string",
+            th.StringType,
+            description="Full connection string for the database (optional)",
         ),
         th.Property(
             "user",

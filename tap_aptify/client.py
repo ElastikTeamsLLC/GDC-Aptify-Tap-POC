@@ -43,6 +43,11 @@ class aptifyConnector(SQLConnector):
         Returns:
             The URL as a string.
         """
+        # If a full connection string is provided in the configuration, use it.
+        if config.get("connection_string"):
+            return config["connection_string"]
+        
+        # Otherwise, construct the SQLAlchemy URL from individual components.
         url_drivername = "mssql+pymssql"
         config_url = URL.create(
             url_drivername,
@@ -51,10 +56,10 @@ class aptifyConnector(SQLConnector):
             host=config.get('host'),
             database=config.get('database'),
         )
-
+        
         if 'port' in config:
             config_url = config_url.set(port=config.get('port', 1433))
-
+        
         return str(config_url)
 
     def create_engine(self) -> Engine:
