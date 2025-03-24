@@ -11,7 +11,7 @@ from uuid import uuid4
 from typing import Any, Iterable, Iterator
 
 import pendulum
-import pyodbc
+# import pyodbc
 import sqlalchemy
 
 from sqlalchemy.engine import Engine
@@ -32,8 +32,8 @@ class aptifyConnector(SQLConnector):
         """Class Default Init"""
         # If pyodbc given set pyodbc.pooling to False
         # This allows SQLA to manage to connection pool
-        if config.get('driver_type') == 'pyodbc':
-            pyodbc.pooling = False
+        # if config.get('driver_type') == 'pyodbc':
+        #     pyodbc.pooling = False
 
         super().__init__(config, sqlalchemy_url)
 
