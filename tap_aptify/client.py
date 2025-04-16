@@ -16,6 +16,7 @@ import sqlalchemy
 
 from sqlalchemy.engine import Engine
 from sqlalchemy.engine.url import URL
+from sqlalchemy import create_engine
 
 from singer_sdk import SQLConnector, SQLStream
 from singer_sdk.batch import BaseBatcher, lazy_chunked_generator
@@ -25,70 +26,53 @@ class aptifyConnector(SQLConnector):
     """Connects to the mssql SQL source."""
 
     def __init__(
-            self,
-            config: dict | None = None,
-            sqlalchemy_url: str | None = None
-         ) -> None:
+        self,
+        config: dict | None = None,
+        sqlalchemy_url: str | None = None
+    ) -> None:
         """Class Default Init"""
-
+        # If pyodbc given set pyodbc.pooling to False
+        # This allows SQLA to manage the connection pool
         if config.get('driver_type') == 'pyodbc':
             pyodbc.pooling = False
 
         super().__init__(config, sqlalchemy_url)
 
-    def get_sqlalchemy_url(cls, config: dict) -> str:
+    def get_sqlalchemy_url(self, config: dict) -> str:
         """Return the SQLAlchemy URL string.
 
         Args:
-            config: A dictionary of settings from the tap or target config.
+            config: Dictionary with connection parameters including:
+                - user: Database username
+                - password: Database password
+                - host: Database host
+                - database: Database name
+                - port: Database port (default: 1433)
 
         Returns:
             The URL as a string.
         """
-        url_drivername = f"{config.get('dialect', 'mssql')}+{config.get('driver_type', 'pyodbc')}"
-        
-        config_url = URL.create(
-            url_drivername,
-            username=config.get('user'),
-            password=config.get('password'),
-            host=config.get('host'),
-            database=config.get('database'),
+        user = config.get('user')
+        password = config.get('password')
+        host = config.get('host')
+        database = config.get('database')
+        port = config.get('port', 1433)
+        connection_string = (
+            f"mssql+pyodbc://{user}:{password}@{host}:{port}/{database}"
+            "?driver=ODBC+Driver+18+for+SQL+Server"
+            "&TrustServerCertificate=yes"
+            "&Encrypt=yes"
         )
-
-        if 'port' in config:
-            config_url = config_url.set(port=config.get('port'))
-
-        driver_query = {
-            "driver": "ODBC Driver 18 for SQL Server",
-            "TrustServerCertificate": "yes",
-            "Encrypt": "yes"
-        }
-        
-        if 'sqlalchemy_url_query' in config:
-            driver_query.update(config.get('sqlalchemy_url_query'))
-        
-        config_url = config_url.update_query_dict(driver_query)
-
-        return str(config_url)
+        return connection_string
 
     def create_engine(self) -> Engine:
         """Return a new SQLAlchemy engine using the provided config.
 
-
         Returns:
             A newly created SQLAlchemy engine object.
         """
-        eng_prefix = "ep."
-        eng_config = {
-            f"{eng_prefix}url": self.sqlalchemy_url,
-            f"{eng_prefix}echo": "False"
-        }
-
-        if self.config.get('sqlalchemy_eng_params'):
-            for key, value in self.config['sqlalchemy_eng_params'].items():
-                eng_config.update({f"{eng_prefix}{key}": value})
-
-        return sqlalchemy.engine_from_config(eng_config, prefix=eng_prefix)
+        eng_params = self.config.get('sqlalchemy_eng_params', {})
+        return sqlalchemy.create_engine(self.sqlalchemy_url, echo=False, **eng_params)
 
     def to_jsonschema_type(
             self,
@@ -97,10 +81,13 @@ class aptifyConnector(SQLConnector):
             | type[sqlalchemy.types.TypeEngine],) -> None:
         """Returns a JSON Schema equivalent for the given SQL type.
 
+        Developers may optionally add custom logic before calling the default
+        implementation inherited from the base class.
 
         Args:
             from_type: The SQL type as a string or as a TypeEngine.
-
+                If a TypeEngine is provided, it may be provided as a class or
+                a specific object instance.
 
         Returns:
             A compatible JSON Schema type definition.
@@ -119,7 +106,6 @@ class aptifyConnector(SQLConnector):
         """Returns a JSON Schema equivalent for the given SQL type.
 
 
-
         Args:
             from_type: The SQL type as a string or as a TypeEngine.
 
@@ -136,7 +122,6 @@ class aptifyConnector(SQLConnector):
 
         if str(from_type) in ["MONEY", "SMALLMONEY"]:
             from_type = "number"
-
 
         if str(from_type) in ['BIT']:
             from_type = "bool"
@@ -162,7 +147,6 @@ class aptifyConnector(SQLConnector):
         Returns:
             A compatible JSON Schema type definition.
         """
-        # This is taken from to_jsonschema_type() in typing.py
         if isinstance(from_type, str):
             sql_type_name = from_type
         elif isinstance(from_type, sqlalchemy.types.TypeEngine):
@@ -176,7 +160,6 @@ class aptifyConnector(SQLConnector):
                 "Expected `str` or a SQLAlchemy `TypeEngine` object or type."
              )
 
-        # Add in the length of the
         if sql_type_name in ['CHAR', 'NCHAR', 'VARCHAR', 'NVARCHAR']:
             maxLength: int = getattr(from_type, 'length')
 
@@ -222,7 +205,6 @@ class aptifyConnector(SQLConnector):
         if sql_type_name == 'BIT':
             return {"type": ["boolean"]}
 
-        # This is a MSSQL only DataType
         if sql_type_name == 'TINYINT':
             return {
                 "type": ["integer"],
@@ -290,7 +272,6 @@ class aptifyConnector(SQLConnector):
                         "maximum": float(maximum_scientific_format)
                     }
 
-        # This is a MSSQL only DataType
         if sql_type_name == "SMALLMONEY":
             return {
                 "type": ["number"],
@@ -298,8 +279,6 @@ class aptifyConnector(SQLConnector):
                 "maximum": 214748.3647
             }
 
-        # This is a MSSQL only DataType
-        # The min and max are getting truncated catalog
         if sql_type_name == "MONEY":
             return {
                 "type": ["number"],
@@ -328,7 +307,6 @@ class aptifyConnector(SQLConnector):
         """Return a JSON Schema representation of the provided type.
 
         By default will call `typing.to_sql_type()`.
-
         Args:
             jsonschema_type: The JSON Schema representation of the source type.
 
@@ -392,13 +370,9 @@ class CustomJSONEncoder(json.JSONEncoder):
         if isinstance(obj, datetime.date):
             return obj.isoformat()
 
-        # Time in ISO format truncated to the second to pass
-        # json-schema validation
         if isinstance(obj, datetime.time):
             return obj.isoformat(timespec='seconds')
 
-        # JSON Encoder doesn't know Decimals but it
-        # does know float so we convert Decimal to float
         if isinstance(obj, Decimal):
             return float(obj)
         
@@ -466,7 +440,6 @@ class aptifyStream(SQLStream):
         Returns:
             The resulting record dict, or `None` if the record should be excluded.
         """
-
         record: dict = row
 
         # Get the Stream Properties Dictornary from the Schema
@@ -519,7 +492,6 @@ class aptifyStream(SQLStream):
         if self.replication_key:
             replication_key_col = table.columns[self.replication_key]
             query = query.order_by(replication_key_col)
-
             if replication_key_col.type.python_type in (
                 datetime.datetime,
                 datetime.date
@@ -539,5 +511,6 @@ class aptifyStream(SQLStream):
             for record in conn.execute(query):
                 transformed_record = self.post_process(dict(record._mapping))
                 if transformed_record is None:
+
                     continue
                 yield transformed_record
