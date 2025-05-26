@@ -97,36 +97,12 @@ class aptifyConnector(SQLConnector):
         else:
             return self.org_to_jsonschema_type(from_type)
 
-    @staticmethod
+    
     def org_to_jsonschema_type(
-        from_type: str
-        | sqlalchemy.types.TypeEngine
-        | type[sqlalchemy.types.TypeEngine],
+    self,
+        from_type: str | sqlalchemy.types.TypeEngine | type[sqlalchemy.types.TypeEngine]
     ) -> dict:
-        """Returns a JSON Schema equivalent for the given SQL type.
-
-
-        Args:
-            from_type: The SQL type as a string or as a TypeEngine.
-
-
-        Returns:
-            A compatible JSON Schema type definition.
-        """
-
-        if str(from_type).startswith("NUMERIC"):
-            if str(from_type).endswith(", 0)"):
-                from_type = "int"
-            else:
-                from_type = "number"
-
-        if str(from_type) in ["MONEY", "SMALLMONEY"]:
-            from_type = "number"
-
-        if str(from_type) in ['BIT']:
-            from_type = "bool"
-        
-        return SQLConnector.to_jsonschema_type(from_type)
+        return super().to_jsonschema_type(from_type)
 
     @staticmethod
     def hd_to_jsonschema_type(
