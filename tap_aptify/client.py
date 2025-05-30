@@ -57,9 +57,10 @@ class aptifyConnector(SQLConnector):
         host = config.get('host')
         database = config.get('database')
         port = config.get('port', 1433)
+        driver = config.get("sqlalchemy_url_query", dict()).get("driver", "ODBC+Driver+18+for+SQL+Server").replace(" ", "+")
         connection_string = (
             f"mssql+pyodbc://{user}:{password}@{host}:{port}/{database}"
-            "?driver=ODBC+Driver+18+for+SQL+Server"
+            f"?driver={driver}"
             "&TrustServerCertificate=yes"
             "&Encrypt=yes"
         )
